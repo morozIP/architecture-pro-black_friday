@@ -1,35 +1,40 @@
-# pymongo-api
+# Инструкция по запуску
 
-## Как запустить
+Этот сценарий разворачивает комплексную архитектуру, включающую:
+*   **MongoDB Sharded Cluster**: Config Server (ReplicaSet), 2 Шарда (по 3 узла ReplicaSet в каждом), Mongos Router.
+*   **Redis Cluster**: 6 узлов.
+*   **API Application**: Python приложение для работы с данными.
+*   **Configurators**: Автоматические скрипты инициализации кластеров базы и кэша.
 
-Запускаем mongodb и приложение
+## Запуск проекта
 
-```shell
-docker compose up -d
+### Старт контейнеров
+Используем флаг `--build` для сборки локальных образов (API и конфигураторов) и `-d` для запуска в фоновом режиме.
+```bash
+docker-compose -f "4 sharding-repl-cache/sharding-repl-cache-docker-compose.yaml" up --build -d
 ```
 
-Заполняем mongodb данными
+### Проверка статуса инициализации
+Так как кластеры MongoDB и Redis требуют настройки после старта контейнеров, в проекте есть специальные контейнеры-конфигураторы. Убедитесь, что они отработали успешно:
 
-```shell
-./scripts/mongo-init.sh
+**Проверка MongoDB:**
+```bash
+docker logs mongo-configurator
+```
+*Ожидаемый результат в конце лога:* `Кластер успешно инициирован и протестирован!`
+
+**Проверка Redis:**
+```bash
+docker logs redis-configurator
 ```
 
-## Как проверить
-
-### Если вы запускаете проект на локальной машине
-
-Откройте в браузере http://localhost:8080
-
-### Если вы запускаете проект на предоставленной виртуальной машине
-
-Узнать белый ip виртуальной машины
-
-```shell
-curl --silent http://ifconfig.me
+**Курлим как мужчины**
+в винде баш терминал юзать
+```bash
+curl -X 'GET' 'http://localhost:8080/' -H 'accept: application/json'
 ```
 
-Откройте в браузере http://<ip виртуальной машины>:8080
-
-## Доступные эндпоинты
-
-Список доступных эндпоинтов, swagger http://<ip виртуальной машины>:8080/docs
+### Удаляем все следы присутствия
+```bash
+docker-compose -f "4 sharding-repl-cache/sharding-repl-cache-docker-compose.yaml" down -v --rmi all --remove-orphans
+```
