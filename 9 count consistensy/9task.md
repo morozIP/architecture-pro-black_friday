@@ -45,5 +45,3 @@
     ```json
     { readPreference: "secondaryPreferred" }
     ```
-
-Вам нужна помощь с **Заданием 10** (миграция на Cassandra)?
