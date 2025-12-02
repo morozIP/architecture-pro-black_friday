@@ -14,7 +14,7 @@ from logmiddleware import RouterLoggingMiddleware, logging_config
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from pydantic.functional_validators import BeforeValidator
 from pymongo import errors
-from redis import asyncio as aioredis
+from redis.asyncio.cluster import RedisCluster
 from typing_extensions import Annotated
 
 # Configure JSON logging
@@ -44,6 +44,18 @@ if REDIS_URL:
 else:
     cache = nocache
 
+# Создаем кастомный бэкенд для поддержки Redis Cluster
+class RedisClusterBackend(RedisBackend):
+    async def get_with_ttl(self, key: str) -> tuple[int, str]:
+        # Стандартный RedisBackend использует pipeline() без аргументов,
+        # что в redis-py означает transaction=True (MULTI/EXEC).
+        # В кластерном режиме это вызывает ошибку.
+        # Мы используем transaction=False для группировки команд без атомарности MULTI/EXEC.
+        async with self.redis.pipeline(transaction=False) as pipe:
+            pipe.ttl(key)
+            pipe.get(key)
+            ttl, value = await pipe.execute()
+        return ttl, value
 
 client = motor.motor_asyncio.AsyncIOMotorClient(DATABASE_URL)
 db = client[DATABASE_NAME]
@@ -56,8 +68,8 @@ PyObjectId = Annotated[str, BeforeValidator(str)]
 @app.on_event("startup")
 async def startup():
     if REDIS_URL:
-        redis = aioredis.from_url(REDIS_URL, encoding="utf8", decode_responses=True)
-        FastAPICache.init(RedisBackend(redis), prefix="api:cache")
+        redis =  RedisCluster.from_url(REDIS_URL, decode_responses=True)
+        FastAPICache.init(RedisClusterBackend(redis), prefix="api:cache")
 
 
 class UserModel(BaseModel):
